@@ -179,7 +179,6 @@ class PlayerController(
             .setSelectUndeterminedTextLanguage(true)
             .setPreferredAudioLanguage(java.util.Locale.getDefault().language)
             .setPreferredAudioLanguages("por", "pt", "por-BR", "pt-BR", "eng")
-            .setSelectUndeterminedAudioLanguage(true)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !subtitlesEnabled)
             .build()
     }
