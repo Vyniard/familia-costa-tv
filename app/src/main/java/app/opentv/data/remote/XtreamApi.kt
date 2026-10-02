@@ -5,6 +5,8 @@
  */
 package app.opentv.data.remote
 
+import android.util.JsonReader
+import android.util.JsonToken
 import app.opentv.data.model.Category
 import app.opentv.data.model.Channel
 import app.opentv.data.model.Episode
@@ -13,6 +15,7 @@ import app.opentv.data.model.Series
 import app.opentv.data.model.Source
 import app.opentv.data.model.StreamKind
 import java.io.InputStream
+import java.io.InputStreamReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -121,60 +124,366 @@ class XtreamApi(
         }
     }
 
-    suspend fun movies(source: Source): List<Movie> = withContext(Dispatchers.IO) {
-        getJson(source, "get_vod_streams").arrayOrEmpty.mapNotNull { element ->
-            val obj = element.jsonObjectOrNull ?: return@mapNotNull null
-            val streamId = obj["stream_id"].asStringOrNull ?: return@mapNotNull null
-            val name = obj["name"].asStringOrNull ?: return@mapNotNull null
-            val extension = obj["container_extension"].asStringOrNull?.takeIf { it.isNotBlank() }
-            Movie(
-                sourceId = source.id,
-                streamId = streamId,
-                name = name,
-                categoryId = obj["category_id"].asStringOrNull,
-                posterUrl = obj["stream_icon"].asStringOrNull?.takeIf { it.isNotBlank() },
-                rating = obj["rating"].asDoubleOrNull,
-                year = obj["year"].asIntOrNull,
-                plot = obj["plot"].asStringOrNull,
-                durationSeconds = obj["duration_secs"].asIntOrNull,
-                containerExtension = extension,
-                streamUrl = vodStreamUrl(source, streamId, extension),
-                addedMillis = obj["added"].asLongOrNull?.times(1000) ?: 0L,
-                // Rich metadata is best-effort here: the streams list carries it on some panels
-                // and not others. Whatever is missing is back-filled from get_vod_info on the
-                // first detail open. See asBackdropUrl for the array-or-string handling.
-                backdropUrl = obj.asBackdropUrl("movie_image", "cover_big"),
-                cast = obj["cast"].asStringOrNull ?: obj["actors"].asStringOrNull,
-                director = obj["director"].asStringOrNull,
-                genre = obj["genre"].asStringOrNull,
-                tmdbId = obj["tmdb_id"].asStringOrNull ?: obj["tmdb"].asStringOrNull,
-            )
+    private fun nextStringOrNumber(reader: JsonReader): String? {
+        return when (reader.peek()) {
+            JsonToken.STRING -> reader.nextString().takeIf { it.isNotBlank() && it != "null" }
+            JsonToken.NUMBER -> reader.nextString().takeIf { it.isNotBlank() }
+            JsonToken.NULL -> {
+                reader.nextNull()
+                null
+            }
+            else -> {
+                reader.skipValue()
+                null
+            }
         }
     }
 
-    suspend fun series(source: Source): List<Series> = withContext(Dispatchers.IO) {
-        getJson(source, "get_series").arrayOrEmpty.mapNotNull { element ->
-            val obj = element.jsonObjectOrNull ?: return@mapNotNull null
-            val seriesId = obj["series_id"].asStringOrNull ?: return@mapNotNull null
-            val name = obj["name"].asStringOrNull ?: return@mapNotNull null
-            Series(
-                sourceId = source.id,
-                seriesId = seriesId,
-                name = name,
-                categoryId = obj["category_id"].asStringOrNull,
-                posterUrl = obj["cover"].asStringOrNull?.takeIf { it.isNotBlank() },
-                rating = obj["rating"].asDoubleOrNull,
-                year = obj["year"].asIntOrNull ?: obj["releaseDate"].asStringOrNull?.take(4)?.toIntOrNull(),
-                plot = obj["plot"].asStringOrNull,
-                addedMillis = obj["last_modified"].asLongOrNull?.times(1000) ?: 0L,
-                // get_series carries most of this inline on the majority of panels; anything
-                // missing is back-filled from get_series_info on the first detail open.
-                backdropUrl = obj.asBackdropUrl("cover_big", "cover"),
-                cast = obj["cast"].asStringOrNull ?: obj["actors"].asStringOrNull,
-                genre = obj["genre"].asStringOrNull,
-                tmdbId = obj["tmdb_id"].asStringOrNull ?: obj["tmdb"].asStringOrNull,
-            )
+    private fun nextIntOrNull(reader: JsonReader): Int? {
+        return when (reader.peek()) {
+            JsonToken.NUMBER -> reader.nextInt()
+            JsonToken.STRING -> {
+                val s = reader.nextString()
+                s.substringBefore('.').toIntOrNull()
+            }
+            JsonToken.NULL -> {
+                reader.nextNull()
+                null
+            }
+            else -> {
+                reader.skipValue()
+                null
+            }
         }
+    }
+
+    private fun nextDoubleOrNull(reader: JsonReader): Double? {
+        return when (reader.peek()) {
+            JsonToken.NUMBER -> reader.nextDouble()
+            JsonToken.STRING -> {
+                val s = reader.nextString()
+                s.toDoubleOrNull()
+            }
+            JsonToken.NULL -> {
+                reader.nextNull()
+                null
+            }
+            else -> {
+                reader.skipValue()
+                null
+            }
+        }
+    }
+
+    private fun nextLongOrNull(reader: JsonReader): Long? {
+        return when (reader.peek()) {
+            JsonToken.NUMBER -> reader.nextLong()
+            JsonToken.STRING -> {
+                val s = reader.nextString()
+                s.substringBefore('.').toLongOrNull()
+            }
+            JsonToken.NULL -> {
+                reader.nextNull()
+                null
+            }
+            else -> {
+                reader.skipValue()
+                null
+            }
+        }
+    }
+
+    private fun readMovieFromReader(reader: JsonReader, source: Source): Movie? {
+        reader.beginObject()
+        var streamId: String? = null
+        var name: String? = null
+        var categoryId: String? = null
+        var posterUrl: String? = null
+        var rating: Double? = null
+        var year: Int? = null
+        var plot: String? = null
+        var durationSeconds: Int? = null
+        var containerExtension: String? = null
+        var addedMillis = 0L
+        var backdropUrl: String? = null
+        var cast: String? = null
+        var director: String? = null
+        var genre: String? = null
+        var tmdbId: String? = null
+
+        while (reader.hasNext()) {
+            val key = reader.nextName()
+            if (reader.peek() == JsonToken.NULL) {
+                reader.nextNull()
+                continue
+            }
+            when (key) {
+                "stream_id" -> streamId = nextStringOrNumber(reader)
+                "name" -> name = nextStringOrNumber(reader)
+                "category_id" -> categoryId = nextStringOrNumber(reader)
+                "stream_icon" -> posterUrl = nextStringOrNumber(reader)
+                "rating" -> rating = nextDoubleOrNull(reader)
+                "year" -> year = nextIntOrNull(reader)
+                "plot" -> plot = nextStringOrNumber(reader)
+                "duration_secs" -> durationSeconds = nextIntOrNull(reader)
+                "container_extension" -> containerExtension = nextStringOrNumber(reader)
+                "added" -> {
+                    val sec = nextLongOrNull(reader) ?: 0L
+                    addedMillis = sec * 1000L
+                }
+                "backdrop_path" -> {
+                    if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            if (backdropUrl == null && (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER)) {
+                                val u = reader.nextString()
+                                if (u.isNotBlank() && u != "null") backdropUrl = u
+                            } else {
+                                reader.skipValue()
+                            }
+                        }
+                        reader.endArray()
+                    } else if (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER) {
+                        val u = reader.nextString()
+                        if (backdropUrl == null && u.isNotBlank() && u != "null") backdropUrl = u
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "movie_image", "cover_big" -> {
+                    if (backdropUrl == null && (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER)) {
+                        val u = reader.nextString()
+                        if (u.isNotBlank() && u != "null") backdropUrl = u
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "cast", "actors" -> {
+                    val c = nextStringOrNumber(reader)
+                    if (cast == null && !c.isNullOrBlank()) cast = c
+                }
+                "director" -> director = nextStringOrNumber(reader)
+                "genre" -> genre = nextStringOrNumber(reader)
+                "tmdb_id", "tmdb" -> {
+                    val t = nextStringOrNumber(reader)
+                    if (tmdbId == null && !t.isNullOrBlank()) tmdbId = t
+                }
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+
+        if (streamId == null || name == null) return null
+        return Movie(
+            sourceId = source.id,
+            streamId = streamId,
+            name = name,
+            categoryId = categoryId,
+            posterUrl = posterUrl,
+            rating = rating,
+            year = year,
+            plot = plot,
+            durationSeconds = durationSeconds,
+            containerExtension = containerExtension,
+            streamUrl = vodStreamUrl(source, streamId, containerExtension),
+            addedMillis = addedMillis,
+            backdropUrl = backdropUrl,
+            cast = cast,
+            director = director,
+            genre = genre,
+            tmdbId = tmdbId,
+        )
+    }
+
+    private fun readSeriesFromReader(reader: JsonReader, source: Source): Series? {
+        reader.beginObject()
+        var seriesId: String? = null
+        var name: String? = null
+        var categoryId: String? = null
+        var posterUrl: String? = null
+        var rating: Double? = null
+        var year: Int? = null
+        var plot: String? = null
+        var addedMillis = 0L
+        var backdropUrl: String? = null
+        var cast: String? = null
+        var genre: String? = null
+        var tmdbId: String? = null
+
+        while (reader.hasNext()) {
+            val key = reader.nextName()
+            if (reader.peek() == JsonToken.NULL) {
+                reader.nextNull()
+                continue
+            }
+            when (key) {
+                "series_id" -> seriesId = nextStringOrNumber(reader)
+                "name" -> name = nextStringOrNumber(reader)
+                "category_id" -> categoryId = nextStringOrNumber(reader)
+                "cover" -> posterUrl = nextStringOrNumber(reader)
+                "rating" -> rating = nextDoubleOrNull(reader)
+                "year" -> year = nextIntOrNull(reader)
+                "releaseDate" -> {
+                    if (year == null && (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER)) {
+                        year = reader.nextString().take(4).toIntOrNull()
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "plot" -> plot = nextStringOrNumber(reader)
+                "last_modified" -> {
+                    val sec = nextLongOrNull(reader) ?: 0L
+                    addedMillis = sec * 1000L
+                }
+                "backdrop_path" -> {
+                    if (reader.peek() == JsonToken.BEGIN_ARRAY) {
+                        reader.beginArray()
+                        while (reader.hasNext()) {
+                            if (backdropUrl == null && (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER)) {
+                                val u = reader.nextString()
+                                if (u.isNotBlank() && u != "null") backdropUrl = u
+                            } else {
+                                reader.skipValue()
+                            }
+                        }
+                        reader.endArray()
+                    } else if (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER) {
+                        val u = reader.nextString()
+                        if (backdropUrl == null && u.isNotBlank() && u != "null") backdropUrl = u
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "cover_big" -> {
+                    if (backdropUrl == null && (reader.peek() == JsonToken.STRING || reader.peek() == JsonToken.NUMBER)) {
+                        val u = reader.nextString()
+                        if (u.isNotBlank() && u != "null") backdropUrl = u
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                "cast", "actors" -> {
+                    val c = nextStringOrNumber(reader)
+                    if (cast == null && !c.isNullOrBlank()) cast = c
+                }
+                "genre" -> genre = nextStringOrNumber(reader)
+                "tmdb_id", "tmdb" -> {
+                    val t = nextStringOrNumber(reader)
+                    if (tmdbId == null && !t.isNullOrBlank()) tmdbId = t
+                }
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+
+        if (seriesId == null || name == null) return null
+        return Series(
+            sourceId = source.id,
+            seriesId = seriesId,
+            name = name,
+            categoryId = categoryId,
+            posterUrl = posterUrl,
+            rating = rating,
+            year = year,
+            plot = plot,
+            addedMillis = addedMillis,
+            backdropUrl = backdropUrl,
+            cast = cast,
+            genre = genre,
+            tmdbId = tmdbId,
+        )
+    }
+
+    suspend fun streamMovies(
+        source: Source,
+        onBatch: suspend (List<Movie>) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val builder = baseUrl(source).newBuilder()
+            .encodedPath("/player_api.php")
+            .addQueryParameter("username", source.username.orEmpty())
+            .addQueryParameter("password", source.password.orEmpty())
+            .addQueryParameter("action", "get_vod_streams")
+
+        http.newCall(request(source, builder.build())).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw XtreamException(describeHttpFailure(response.code))
+            }
+            val stream = response.body?.byteStream() ?: return@withContext
+            val reader = JsonReader(InputStreamReader(stream, Charsets.UTF_8))
+            reader.isLenient = true
+            if (reader.peek() != JsonToken.BEGIN_ARRAY) {
+                return@withContext
+            }
+            reader.beginArray()
+            val batch = ArrayList<Movie>(500)
+            while (reader.hasNext()) {
+                val movie = readMovieFromReader(reader, source)
+                if (movie != null) {
+                    batch.add(movie)
+                    if (batch.size >= 500) {
+                        onBatch(batch.toList())
+                        batch.clear()
+                    }
+                }
+            }
+            if (batch.isNotEmpty()) {
+                onBatch(batch.toList())
+                batch.clear()
+            }
+            reader.endArray()
+        }
+    }
+
+    suspend fun streamSeries(
+        source: Source,
+        onBatch: suspend (List<Series>) -> Unit,
+    ) = withContext(Dispatchers.IO) {
+        val builder = baseUrl(source).newBuilder()
+            .encodedPath("/player_api.php")
+            .addQueryParameter("username", source.username.orEmpty())
+            .addQueryParameter("password", source.password.orEmpty())
+            .addQueryParameter("action", "get_series")
+
+        http.newCall(request(source, builder.build())).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw XtreamException(describeHttpFailure(response.code))
+            }
+            val stream = response.body?.byteStream() ?: return@withContext
+            val reader = JsonReader(InputStreamReader(stream, Charsets.UTF_8))
+            reader.isLenient = true
+            if (reader.peek() != JsonToken.BEGIN_ARRAY) {
+                return@withContext
+            }
+            reader.beginArray()
+            val batch = ArrayList<Series>(500)
+            while (reader.hasNext()) {
+                val s = readSeriesFromReader(reader, source)
+                if (s != null) {
+                    batch.add(s)
+                    if (batch.size >= 500) {
+                        onBatch(batch.toList())
+                        batch.clear()
+                    }
+                }
+            }
+            if (batch.isNotEmpty()) {
+                onBatch(batch.toList())
+                batch.clear()
+            }
+            reader.endArray()
+        }
+    }
+
+    suspend fun movies(source: Source): List<Movie> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Movie>()
+        streamMovies(source) { list.addAll(it) }
+        list
+    }
+
+    suspend fun series(source: Source): List<Series> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Series>()
+        streamSeries(source) { list.addAll(it) }
+        list
     }
 
     /**

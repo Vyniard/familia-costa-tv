@@ -444,7 +444,7 @@ interface MovieDao {
      * genre-affinity recommendations, more-like-this). One pass over a few thousand rows is cheap;
      * per-genre `LIKE` queries would multiply round-trips and risk substring false positives.
      */
-    @Query("SELECT * FROM movies ORDER BY addedMillis DESC")
+    @Query("SELECT * FROM movies ORDER BY addedMillis DESC LIMIT 2000")
     suspend fun all(): List<Movie>
 
     /** How many movies are on disk. A cheap COUNT the home feeds use to tell "the library grew"
@@ -537,7 +537,7 @@ interface SeriesDao {
     fun observeRecentlyAdded(limit: Int): Flow<List<Series>>
 
     /** Every series, newest first — working set for the Kotlin-side by-genre / more-like-this feeds. */
-    @Query("SELECT * FROM series ORDER BY addedMillis DESC")
+    @Query("SELECT * FROM series ORDER BY addedMillis DESC LIMIT 2000")
     suspend fun all(): List<Series>
 
     /** How many series are on disk — the cheap "did the library grow" check for the home feeds. */

@@ -52,8 +52,8 @@ class AppSettings private constructor(context: Context) {
     private val _guidePreviewVideo = MutableStateFlow(prefs.getBoolean(KEY_PREVIEW_VIDEO, true))
     val guidePreviewVideo: StateFlow<Boolean> = _guidePreviewVideo.asStateFlow()
 
-    /** Whether the guide preview plays sound (off by default — quieter while browsing). */
-    private val _guidePreviewSound = MutableStateFlow(prefs.getBoolean(KEY_PREVIEW_SOUND, false))
+    /** Whether the guide preview plays sound (on by default so channels aren't silent). */
+    private val _guidePreviewSound = MutableStateFlow(prefs.getBoolean(KEY_PREVIEW_SOUND, true))
     val guidePreviewSound: StateFlow<Boolean> = _guidePreviewSound.asStateFlow()
 
     /** The profile whose watch history is active. Defaults to the built-in profile (id 1). */

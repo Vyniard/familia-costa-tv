@@ -706,31 +706,39 @@ class CatalogRepository(
     }
 
     private suspend fun syncXtreamVod(source: Source, nowUtcMillis: Long) {
-        // VOD is optional: plenty of accounts have live TV only, and a 404 on get_vod_streams
-        // must not cost the user their channel list. Movies and series are gated independently so
-        // a user who only turned off, say, Series still gets their movie library refreshed.
         val moviesOn = settings.moviesEnabled.value
         val seriesOn = settings.seriesEnabled.value
         if (!moviesOn && !seriesOn) return
 
+        // 1. Save categories first so category chips appear in the UI immediately
         val movieCategories =
             if (moviesOn) runCatching { api.movieCategories(source) }.getOrDefault(emptyList())
             else emptyList()
-        val movies =
-            if (moviesOn) runCatching { api.movies(source) }.getOrDefault(emptyList())
-            else emptyList()
         val seriesCategories =
             if (seriesOn) runCatching { api.seriesCategories(source) }.getOrDefault(emptyList())
-            else emptyList()
-        val series =
-            if (seriesOn) runCatching { api.series(source) }.getOrDefault(emptyList())
             else emptyList()
 
         if (movieCategories.isNotEmpty() || seriesCategories.isNotEmpty()) {
             categoryDao.upsertAll(movieCategories + seriesCategories)
         }
-        if (movies.isNotEmpty()) movieDao.upsertAll(movies)
-        if (series.isNotEmpty()) seriesDao.upsertAll(series)
+
+        // 2. Stream movies in batches of 500 directly into Room
+        if (moviesOn) {
+            runCatching {
+                api.streamMovies(source) { batch ->
+                    movieDao.upsertAll(batch)
+                }
+            }.onFailure { Log.w(TAG, "Stream movies failed for source ${source.id}", it) }
+        }
+
+        // 3. Stream series in batches of 500 directly into Room
+        if (seriesOn) {
+            runCatching {
+                api.streamSeries(source) { batch ->
+                    seriesDao.upsertAll(batch)
+                }
+            }.onFailure { Log.w(TAG, "Stream series failed for source ${source.id}", it) }
+        }
     }
 
     private suspend fun syncM3u(source: Source, nowUtcMillis: Long): SyncResult {

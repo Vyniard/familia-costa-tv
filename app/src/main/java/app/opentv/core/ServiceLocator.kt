@@ -46,11 +46,11 @@ object ServiceLocator {
 
         val httpClient: OkHttpClient by lazy {
             OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
                 // Generous: catalogue endpoints on a busy panel can take a long time to
-                // produce 40,000 rows, and timing out mid-list is worse than waiting.
-                .readTimeout(60, TimeUnit.SECONDS)
-                .callTimeout(5, TimeUnit.MINUTES)
+                // produce 50,000+ rows, and timing out mid-list is worse than waiting.
+                .readTimeout(120, TimeUnit.SECONDS)
+                .callTimeout(10, TimeUnit.MINUTES)
                 .retryOnConnectionFailure(true)
                 .followRedirects(true)
                 .build()
