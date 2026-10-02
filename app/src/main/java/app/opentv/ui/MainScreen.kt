@@ -284,14 +284,14 @@ private fun NavRail(
         // Brand: the logo mark alone when collapsed, the mark + "OpenTV" wordmark when open. The
         // name stays on purpose — it's what people search for.
         Row(
-            Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+            Modifier.padding(horizontal = if (expanded) 18.dp else 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
                 painter = painterResource(R.drawable.familia_costa_logo),
                 contentDescription = stringResource(R.string.app_name),
                 contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                modifier = Modifier.size(42.dp),
+                modifier = Modifier.size(48.dp),
             )
             if (expanded) {
                 Spacer(Modifier.width(12.dp))
