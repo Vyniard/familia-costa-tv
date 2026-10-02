@@ -137,6 +137,14 @@ fun AddSourceScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(Modifier.widthIn(max = 640.dp)) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.familia_costa_logo),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier
+                    .height(110.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .padding(bottom = 16.dp),
+            )
             Text(
                 stringResource(
                     if (existing != null) R.string.settings_edit_provider_title

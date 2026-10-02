@@ -24,22 +24,22 @@ import androidx.compose.ui.unit.sp
  * actively unpleasant on a 55" panel at night, so everything here is anchored near-black with
  * a single restrained accent used only for focus and selection.
  */
-private val Accent = Color(0xFF7C93FF)
-private val AccentDim = Color(0xFF4B5DB8)
+private val Accent = Color(0xFFE5B842) // Ouro / Dourado Nobre Família Costa
+private val AccentDim = Color(0xFF997520)
 
 private val DarkScheme = darkColorScheme(
     primary = Accent,
-    onPrimary = Color(0xFF0A0C14),
+    onPrimary = Color(0xFF0A101A),
     primaryContainer = AccentDim,
-    onPrimaryContainer = Color(0xFFE6EAFF),
-    secondary = Color(0xFF9AA3C0),
-    background = Color(0xFF07080C),
-    onBackground = Color(0xFFE8EAF0),
-    surface = Color(0xFF0D0F16),
-    onSurface = Color(0xFFE8EAF0),
-    surfaceVariant = Color(0xFF171A24),
-    onSurfaceVariant = Color(0xFFA8AEC0),
-    outline = Color(0xFF2A2F3D),
+    onPrimaryContainer = Color(0xFFFFF3D6),
+    secondary = Color(0xFF4B79A1), // Azul Nobre
+    background = Color(0xFF0A101A),
+    onBackground = Color(0xFFF0F4F8),
+    surface = Color(0xFF101824),
+    onSurface = Color(0xFFF0F4F8),
+    surfaceVariant = Color(0xFF1A2332),
+    onSurfaceVariant = Color(0xFFCBD5E1),
+    outline = Color(0xFF334155),
     error = Color(0xFFFF6B6B),
     onError = Color(0xFF1A0505),
 )

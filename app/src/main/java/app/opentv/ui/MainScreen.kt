@@ -288,15 +288,15 @@ private fun NavRail(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_opentv_logo),
-                contentDescription = "OpenTV",
-                modifier = Modifier.size(34.dp),
+                painter = painterResource(R.drawable.familia_costa_logo),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)),
             )
             if (expanded) {
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "OpenTV",
-                    style = MaterialTheme.typography.titleLarge,
+                    stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,

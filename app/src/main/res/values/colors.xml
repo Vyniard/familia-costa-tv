@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_background">#FF07080C</color>
-    <color name="accent">#FF7C93FF</color>
+    <color name="window_background">#FF0A101A</color>
+    <color name="accent">#FFD4AF37</color>
+    <color name="accent_blue">#FF2A4D69</color>
 </resources>
