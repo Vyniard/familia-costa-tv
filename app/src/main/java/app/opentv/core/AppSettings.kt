@@ -139,8 +139,8 @@ class AppSettings private constructor(context: Context) {
         _guidePreviewSound.value = enabled
     }
 
-    /** Whether launching the app jumps straight back to the last channel you watched. */
-    private val _resumeLastChannel = MutableStateFlow(prefs.getBoolean(KEY_RESUME_LAST, false))
+    /** Whether launching the app jumps straight back to the last channel you watched. Defaults to true for TV cable experience. */
+    private val _resumeLastChannel = MutableStateFlow(prefs.getBoolean(KEY_RESUME_LAST, true))
     val resumeLastChannel: StateFlow<Boolean> = _resumeLastChannel.asStateFlow()
 
     fun setResumeLastChannel(enabled: Boolean) {

@@ -93,7 +93,19 @@ class SourcesViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             graph.sourceRepository.observeAll().collect { sources ->
-                _ui.value = _ui.value.copy(sources = sources, loaded = true)
+                if (sources.isEmpty()) {
+                    val seed = Source(
+                        name = "Família Costa",
+                        kind = SourceKind.XTREAM,
+                        url = "http://aze11.com",
+                        username = "553793795",
+                        password = "5676",
+                        enabled = true,
+                    )
+                    saveAndSync(seed)
+                } else {
+                    _ui.value = _ui.value.copy(sources = sources, loaded = true)
+                }
             }
         }
     }

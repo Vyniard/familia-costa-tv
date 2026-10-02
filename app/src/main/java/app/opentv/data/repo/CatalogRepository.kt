@@ -80,6 +80,15 @@ data class MovieVariantGroup(
 /** A standalone 4-digit release year (19xx/20xx) as it appears inside a VOD title. */
 private val VOD_YEAR = Regex("""\b(19|20)\d{2}\b""")
 
+private val VOD_TAGS_REGEX = Regex("""\[.*?\]|\(.*?\)|(?i)\b(fhd|4k|uhd|hd|sd|dublado|dub|legendado|leg|h265|hevc|1080p|720p|2160p)\b""")
+
+internal fun simplifyTitle(title: String): String {
+    return title.replace(VOD_TAGS_REGEX, "")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+        .lowercase()
+}
+
 /**
  * Collapses obvious quality variants of the same film — "The Godfather 1972 HD" and
  * "The Godfather 4K" — into one entry with switchable tiers, the VOD analogue of a channel's
@@ -305,9 +314,17 @@ class CatalogRepository(
                     .thenByDescending { it.first.addedMillis },
             )
             .map { it.first }
-            .take(limit)
-
-        return ranked.ifEmpty { topRatedFallback() }
+        val candidates = ranked.ifEmpty { topRatedFallback() }
+        val seen = HashSet<String>()
+        val deduplicated = mutableListOf<Movie>()
+        for (m in candidates) {
+            val key = simplifyTitle(m.name).ifEmpty { m.name.lowercase() }
+            if (seen.add(key)) {
+                deduplicated.add(m)
+                if (deduplicated.size >= limit) break
+            }
+        }
+        return deduplicated
     }
 
     /**
@@ -538,7 +555,23 @@ class CatalogRepository(
         return buckets.entries
             .sortedByDescending { it.value.size }
             .take(maxGenres)
-            .map { GenreGroup(it.key, it.value.take(perGenre)) }
+            .map { entry ->
+                val seen = HashSet<String>()
+                val deduplicated = mutableListOf<T>()
+                for (item in entry.value) {
+                    val name = when (item) {
+                        is Movie -> item.name
+                        is Series -> item.name
+                        else -> null
+                    }
+                    val key = if (name != null) simplifyTitle(name).ifEmpty { name.lowercase() } else item.toString()
+                    if (seen.add(key)) {
+                        deduplicated.add(item)
+                        if (deduplicated.size >= perGenre) break
+                    }
+                }
+                GenreGroup(entry.key, deduplicated)
+            }
     }
 
     /** How strongly a title matches a profile's genre affinity: sum of its genres' tallies. */

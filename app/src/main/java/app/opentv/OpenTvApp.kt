@@ -44,9 +44,10 @@ class OpenTvApp : Application(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(256L * 1024 * 1024)
+                    .maxSizeBytes(512L * 1024 * 1024)
                     .build()
             }
+            .respectCacheHeaders(false)
             .crossfade(false)
             .allowRgb565(true)
             .build()

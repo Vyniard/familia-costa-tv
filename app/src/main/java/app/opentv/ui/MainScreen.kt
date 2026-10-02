@@ -290,7 +290,8 @@ private fun NavRail(
             Image(
                 painter = painterResource(R.drawable.familia_costa_logo),
                 contentDescription = stringResource(R.string.app_name),
-                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.size(42.dp),
             )
             if (expanded) {
                 Spacer(Modifier.width(12.dp))
